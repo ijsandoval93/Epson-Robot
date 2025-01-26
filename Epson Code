@@ -1,1 +1,2381 @@
+'Declare global scope speed variables'
+Global Integer g_SpeedPercent, g_Speed, g_SpeedS
+Global Real SpeedS_Real, SpeedS_Med, SpeedS_Low
+Integer LLoad
+Integer RLoad
+Integer LUnload
+Integer RUnload
+Integer Rejectcount
+Integer PartStatus
+Integer ProcessStatus
+
+
+Real Post_weight
+Real Orientation
+	'Defining speed from speed factor'
+		'g_SpeedS = 1000'
+		'g_SpeedPercent = InW(RobotSpeed)'
+		'Speed g_SpeedPercent'
+		'SpeedS_Real = g_SpeedPercent /100.00 * g_SpeedS'
+		'SpeedS SpeedS_Real'
+		'Accel 100, 100'
+		'AccelR 2500'
+		'AccelS 5000'
+		'Print 'Fine 3700, 3700, 1000, 1000, 1000, 1000'
+		'Fine 3700, 3700, 1000, 1000, 1000, 1000'
+		
+
+
+Function main
+	Pallet 0, P1, P2, P3, 5, 3
+	Pallet 1, P4, P5, P6, 5, 3
+	Pallet 2, P28, P29, P30, 3, 3
+	Pallet 3, P22, P23, P24, 5, 3
+	Pallet 4, P25, P26, P27, 5, 3
+	
+	'~~~~~~ DO NOT TOUCH: VERY LIMITED SPACE~~~~~~'
+	HomeSet -24467, 3335858, -1061480, 9997, -3653515, 22982 'These values are in encoder pulses'
+	'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	
+	Print "Test"
+	
+	'Reset
+	
+	'If Sw(520) = 1 And Sw(521) = 0 Then
+	'Motor On
+	'On 520
+	'EndIf
+	
+	'If Sw(521) = 1 And Sw(520) = 0 Then
+	'Motor Off
+	'Off 521
+	'EndIf
+	
+	Speed 5
+	Accel 10, 30
+	SpeedS 100
+	AccelS 100
+	'LLoad = 1
+	'RLoad = 1
+	'Rejectcount = 1
+	Power High
+	Print "Test1"
+	
+	
+Do
+
+	ProcessStatus = InW(Process_status)
+	
+	PartStatus = InW(Part_Status)
+	
+	Print "Process Status:", ProcessStatus
+	
+	If Sw(522) = 1 And Sw(538) = 1 And AtHome = 0 Then
+		Print "Calling Home"
+		Call GoHome
+	EndIf
+	
+	If AtHome = 1 And Sw(560) = 1 And Sw(537) = 1 Then
+		
+		
+		Print " Am I in this loop"
+		
+		If (ProcessStatus = 0 Or ProcessStatus = 10) And PartStatus = 0 Then
+
+			Call FlipStation
+
+		ElseIf (ProcessStatus = 20 Or ProcessStatus = 30) And PartStatus = 0 Then
+		
+			Call Weightstation
+			
+		ElseIf (ProcessStatus = 40 And PartStatus = 0) Then
+		
+			Call WeightStation2
+			
+		ElseIf (ProcessStatus = 50 And PartStatus = 0) Then
+		
+			Call BallPress
+			
+		ElseIf (ProcessStatus = 60 And PartStatus = 0) Then
+	
+			Call Unload
+			
+		ElseIf PartStatus <> 0 Then
+		
+			Call Reject
+			Call Start
+		EndIf
+		
+	EndIf
+	
+	If AtHome = 1 And Sw(561) = 1 And Sw(607) = 1 Then
+	
+		If (ProcessStatus = 20 Or ProcessStatus = 30) And PartStatus = 0 Then
+			Call Weightstation
+			
+		ElseIf (ProcessStatus = 40 And PartStatus = 0) Then
+			Call WeightStation2
+			
+		EndIf
+		
+	EndIf
+	
+'	If AtHome = 1 And Sw(568) = 1 And Sw(537) = 1 Then
+'		Call FlipStation
+'		Call Start
+'	EndIf
+	
+	If Sw(536) = 1 And Sw(537) = 1 And Sw(561) = 1 Then
+		Print "Starting Auto Sequence"
+		Call Start
+	EndIf
+
+Loop
+
+	Call GoHome
+	
+
+
+Fend
+Function GoHome
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+' This is inside the Load Drawers Zone'
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	If InsideBox(1) = 1 Then
+		Do Until InsideBox(1) = 0
+			Move CurPos +Z(150)
+		Loop
+		
+		If InsideBox(1) = 0 Then
+			Move Cell_Scan
+		EndIf
+		
+		Home
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+' This is inside the Rotary Zone'		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	ElseIf InsideBox(2) = 1 Then
+		
+		Move Rotary_Place +Z(117)
+		Home
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+' This is inside the Cell Scan Zone'		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	ElseIf InsideBox(3) = 1 Then
+	
+		Move Cell_Scan
+		Home
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+' This is inside Nest 3 and 4 Zone'		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	ElseIf InsideBox(4) = 1 Then
+		If Sw(Part1Enabled) = 1 Then
+			Move CurPos -Y(80)
+			Move Cell_Scan
+		EndIf
+		
+		If Sw(Part2Enabled) = 1 Then
+			Move CurPos +Z(30)
+			Move CurPos -Y(80)
+			Move Cell_Scan
+		EndIf
+		
+		Home
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+' This is inside Nest 1 and 2 Zone'		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	ElseIf InsideBox(5) = 1 And InsideBox(9) = 0 Then
+		If Sw(Part1Enabled) = 1 Then
+			Move CurPos -Y(80) CP
+			Move Weight_App +X(150) -RZ(90)
+		EndIf
+		
+		If Sw(Part2Enabled) = 1 Then
+			Move CurPos +Z(30)
+			Move CurPos -Y(80) CP
+			Move Weight_App +X(150) -RZ(90)
+		EndIf
+		
+		Home
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+' This is inside Nest 1 and 2 Zone but focuses on Nest 1 safe escape'	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	ElseIf InsideBox(5) = 1 And InsideBox(9) = 1 Then
+		If Sw(Part1Enabled) = 1 Then
+			Move FillNest1App2Part1
+			Move FillNest1AppPart1
+			Move Weight_App +X(150) -RZ(90)
+		EndIf
+		If Sw(Part2Enabled) = 1 Then
+			Move FillNest1Part2 +Z(60)
+			Move Weight_App +X(150) -RZ(90)
+		EndIf
+		Home
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+' This is inside Ball Press Zone'
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	ElseIf InsideBox(6) = 1 Then
+		If Sw(Part1Enabled) = 1 Then
+			Move CurPos +X(-75)
+			Move Weight_App +X(150) -RZ(90)
+		EndIf
+		If Sw(Part2Enabled) = 1 Then
+			Move CurPos +Z(30)
+			Move Weight_App +X(150) -RZ(90)
+		EndIf
+		Home
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+' This is inside Unload Zone'		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	ElseIf InsideBox(7) = 1 And Sw(560) = 1 Then
+	
+		Call Unload
+		Home
+		
+	ElseIf InsideBox(7) = 1 And Sw(561) = 1 Then
+		Do Until InsideBox(7) = 0
+			Move CurPos +Z(300)
+		Loop
+		Move Unload_App +Z(100) CP
+		Move Weight_App +X(150) -RZ(90)
+		Home
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+' This is inside Reject Zone'
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	ElseIf InsideBox(8) = 1 Then
+	
+		Move CurPos +Z(30)
+		Move Cell_Scan
+		Home
+		
+	Else
+		Home
+		Call Start
+	EndIf
+	
+	Exit Function
+Fend
+Function Start
+
+Print "Run the loop once the machine has started"
+	Do
+				
+	Print "Check Load Drawer Count"
+	LLoad = InW(LLoad_Counter)
+	RLoad = InW(RLoad_Counter)
+	Post_weight = InW(Post_Weight_station)
+	
+	Print "LLoad:", (LLoad)
+	Print "RLoad:", (RLoad)
+	
+	If Sw(606) = 1 Or (Sw(596) = 1 And Sw(606) = 0 And Sw(560) = 1) Then 'And Post_weight <> 0)
+		
+	Call BallPress
+		
+	
+	ElseIf (Sw(592) = 1 Or Sw(593) = 1 Or Sw(594) = 1 Or Sw(595) = 1) And Sw(597) = 1 And Sw(539) = 0 And Sw(561) = 1 And ((LLoad < 16 And Sw(577) = 1) Or (RLoad < 16 And Sw(578) = 1)) Then
+
+	Call Loaddrawer
+
+	'EndIf
+	
+
+	ElseIf Sw(600) = 1 And InsideBox(1) = 0 Then
+
+	Call FillNest1
+	
+	'Call Start
+	 
+	'Exit Function
+	 
+	'EndIf
+	
+
+
+	ElseIf Sw(601) = 1 And InsideBox(1) = 0 Then
+	
+	Call FillNest2
+	
+	'Call Start
+	
+	'Exit Function
+	
+	'EndIf
+	
+
+
+	ElseIf Sw(602) = 1 And InsideBox(1) = 0 Then
+
+	Call FillNest3
+	
+	'Exit Function
+	
+	'Call Start
+	 
+	'EndIf
+	
+
+
+	ElseIf Sw(603) = 1 And InsideBox(1) = 0 Then
+	
+	Call FillNest4
+	
+	'Exit Function
+	
+	'Call Start
+	
+	ElseIf ((LLoad >= 16 Or Sw(577) = 0) And (RLoad >= 16 Or Sw(578) = 0)) Or (Sw(539) = 1 And Sw(600) = 0 And Sw(601) = 0 And Sw(602) = 0 And Sw(603) = 0) And AtHome = 0 Then
+	
+	Call GoHome
+	Call Start
+	
+	EndIf
+'	Call Weightstation
+	 
+'	Call Fillnest1
+	
+'	Call FillNest2
+
+' 	Call FillNest3
+	
+'	Call FillNest4
+	
+'	Call Reject
+	
+'	If Sw(RunRecovery) = True And Oport(MotorsOn) = True Then'
+'		Call fn_Recovery'
+	'Else'
+		'Program loop Starts here		'
+'Integer Count'
+Loop
+
+Fend
+Function Loaddrawer
+	
+
+Print "LoadDrawer Called"
+	LLoad = InW(LLoad_Counter)
+	RLoad = InW(RLoad_Counter)
+
+If AtHome = True And ((Sw(577) = 1 And LLoad < 16) Or (Sw(578) = 1 And RLoad < 16)) And Sw(576) = 1 And Sw(549) = 1 And Sw(550) = 1 And Sw(548) = 1 Then
+	
+	Go Rotary_Place +Z(115) CP
+	
+	
+EndIf
+
+
+If Sw(577) = 1 And Sw(576) = 1 And Sw(550) = 1 Then
+	If LLoad < 16 Then
+		
+		Go LLoad_App
+		
+		'LLoad = InW(LLoad_Counter)
+		
+		'Wait LLoad <> 0
+		
+		Print "LLoad Cell Number:", (LLoad)
+		 	
+        Go Pallet(0, LLoad) +Z(70) CP
+
+		Move Pallet(0, LLoad)
+		
+		On Robot_Gripper_Close_Request 'Output 549 = On 'Gripper Close Output''
+		
+		Wait 1
+		
+		If Sw(560) = 0 And Sw(561) = 0 Then
+
+			Off Robot_Gripper_Close_Request
+
+			On Robot_Gripper_Open_Request
+
+			On LLoad_Increment
+			
+			On LeftLoadMispick
+
+			Move Pallet(0, LLoad) +Z(70)
+			
+			Off LeftLoadMispick
+
+			Off LLoad_Increment
+
+			Off Robot_Gripper_Open_Request
+
+			Call Start
+		EndIf
+		
+		Wait Sw(560) = 1
+		'Wait 0.2
+		
+		On LLoad_Mispick_Reset
+		
+		Off Robot_Gripper_Close_Request 'Output 549 = Off 'Gripper Close Output''
+		
+		Off LLoad_Mispick_Reset
+		
+		On LLoad_Increment
+				
+		Move Pallet(0, LLoad) +Z(190) CP
+		
+		Off LLoad_Increment
+	
+		'Go LLoad_App
+		
+		Call FlipStation
+		Exit Function
+	EndIf
+EndIf
+
+
+If Sw(578) = 1 And Sw(576) = 1 And Sw(549) = 1 And Sw(548) = 1 Then
+	If RLoad < 16 Then ' And LLoad = 16 Then
+		
+		Go RLoad_App
+		
+		'RLoad = InW(RLoad_Counter)
+		
+		'Wait RLoad <> 0
+		
+		Print "RLoad Cell Number:", (RLoad)
+        
+        Go Pallet(1, RLoad) +Z(70)
+        
+		Go Pallet(1, RLoad)
+		
+		On Robot_Gripper_Close_Request 'Output 549 = On 'Gripper Close Output''
+		
+		Wait 1
+		
+		If Sw(560) = 0 And Sw(561) = 0 Then
+
+			Off Robot_Gripper_Close_Request
+
+			On Robot_Gripper_Open_Request
+
+			On RLoad_Increment
+			
+			On RightLoadMispick
+
+			Move Pallet(1, RLoad) +Z(70)
+			
+			Off RightLoadMispick
+
+			Off RLoad_Increment
+
+			Off Robot_Gripper_Open_Request
+
+			Call Start
+		EndIf
+		
+		Wait Sw(560) = 1
+		'Wait 0.2
+		
+		On RLoad_Mispick_Reset
+		
+		Off Robot_Gripper_Close_Request 'Output 549 = Off 'Gripper Close Output''
+		
+		Off RLoad_Mispick_Reset
+		
+		On RLoad_Increment
+				
+		Move Pallet(1, RLoad) +Z(200)
+		
+		Off RLoad_Increment
+	
+		'Go RLoad_App
+			
+		Call FlipStation
+		Exit Function
+	EndIf
+EndIf
+
+
+'	If LLoad = 16 Or RLoad = 16 Then
+	
+		'-----------------------------------------------------------------------
+'		Print "Load Drawers Empty"
+		'-----------------------------------------------------------------------
+'		Wait(LLoad = 0 And Sw(557) = 1) Or(RLoad = 0 And Sw(558) = 1)
+		
+'		Call Loaddrawer
+		
+		'-----------------------------------------------------------------------
+'		Print "Calling LoadDrawer"
+		'-----------------------------------------------------------------------
+'	EndIf
+	
+	'Call FlipStation
+'	EndIf'
+
+'Call GoHome
+
+Exit Function
+Fend
+Function FlipStation
+
+	ProcessStatus = InW(Process_status)
+	
+	If ProcessStatus = 0 Then
+	
+		Print "Going to Rotary Place"
+
+		Go Rotary_Place +Z(115)
+	
+		If Sw(568) = 0 Then 'And Sw(571) = 1 Then'
+	
+			Wait Sw(569) And Sw(571) = 1
+				Print " Part1"
+			Move Rotary_Place
+		
+			On Robot_Flip_PartPlace_ACK
+	
+			On Robot_In_Rotary
+				Print " Part2"
+			Wait Sw(561) = 1 'wait for Robot Gripper Open bit here'	
+	
+			Move Rotary_Place +Z(117)
+		
+			Off Robot_Flip_PartPlace_ACK
+				Print " Part3"
+			Off Robot_In_Rotary
+		EndIf
+	
+		On Robot_Clear_of_Rotary
+		
+		Wait Sw(570) = 1 'Wait for Rotary flip advance indication'
+	
+		Move Rotary_Place -Z(6)
+				Print " Part4"
+			
+		WaitPos
+
+		On Robot_In_Rotary
+	
+		Off Robot_Clear_of_Rotary
+	
+		Wait Sw(605) = 1
+	
+		Wait Sw(560) = 1 'Wait for Robot Gripper Close bit here'	
+
+		Wait Sw(569) = 1 'Wait for rotary Gripper Open'
+	
+		Move Rotary_Place +Z(150)
+	
+		On Robot_Flip_PartPick_ACK
+	
+		Off Robot_In_Rotary
+	
+	ProcessStatus = InW(Process_status)
+	
+	'-----------------------------------------------------------------------
+	Print "Rotary Cleared"
+	'-----------------------------------------------------------------------
+	Print "Cell Scan Started"
+	'-----------------------------------------------------------------------
+	
+	EndIf
+	
+
+	'If ProcessStatus = 10 Then
+	
+		Go Cell_Scan
+	
+		Off Robot_Flip_PartPick_ACK
+	
+		On Robot_Clear_of_Rotary
+	
+		Go Cell_Scan2
+	
+		Off Robot_Clear_of_Rotary
+	
+	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Scan for Part 1~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+
+
+		If Sw(Part1Enabled) = 1 Then
+
+			On Part1DMCScan
+			Wait 0.2
+			Off Part1DMCScan
+	
+			If Sw(572) = 0 Then
+				 Speed 20
+			     Go Cell_Scan3
+					If Sw(572) = 0 Then
+		'-----------------------------------------------------------------------	
+			Print "Part Failed Scan"
+		'-----------------------------------------------------------------------
+					Go Cell_Scan2
+					Go Cell_Scan -Z(40)
+					Call Reject
+					Exit Function
+					EndIf
+			EndIf
+		EndIf
+	
+	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Scan for Part 2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+		If Sw(Part2Enabled) = 1 Then
+
+			On Part2DMCScan
+			Wait 0.2
+			Off Part2DMCScan
+	
+				If Sw(572) = 0 Then
+			 		Speed 20
+		     		Go Cell_Scan3Part2
+		     		Wait 1
+						If Sw(572) = 0 Then
+		'-----------------------------------------------------------------------	
+			Print "Part Failed Scan"
+		'-----------------------------------------------------------------------
+							Go Cell_Scan2
+							Go Cell_Scan -Z(40)
+							Call Reject
+							Exit Function
+						EndIf
+				EndIf
+		EndIf
+	'Add an IF statement here until scan success bit is high' 
+	
+        'Call Loaddrawer
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is End of Scan~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+
+		'-----------------------------------------------------------------------	
+		Print "Part Passed Scan"
+		'-----------------------------------------------------------------------
+		Speed 100
+	
+		Go Cell_Scan +Z(30)
+	
+		'-----------------------------------------------------------------------	
+			Print "Part Calling Weight Station"
+		'-----------------------------------------------------------------------
+		Call Weightstation
+	
+		Exit Function
+	
+	'EndIf
+	
+	
+Fend
+Function Weightstation
+	
+ProcessStatus = InW(Process_status)
+	
+If ProcessStatus = 20 Then
+	
+	
+	Move Weight_App -X(150) CP
+	
+	Move Weight_App
+	
+	On WeightScale_PreTest
+	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Weigh Station for Part 1~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+
+
+		If Sw(Part1Enabled) = 1 Then
+
+			Go Weight_App -Z(34)
+	
+		EndIf
+
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Weigh Station for Part 2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+
+
+		If Sw(Part2Enabled) = 1 Then
+
+			Move Weight_App -Z(70)
+	
+		EndIf
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+	
+	On Robot_In_Weight_Scale_Position
+
+	On 550
+	
+	Wait Sw(561) = 1  'Wait for Open Gripper Bit'	
+	
+	Off 550
+
+	Off Robot_In_Weight_Scale_Position
+	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Weigh Station for Part 1~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+	
+If Sw(Part1Enabled) = 1 Then
+	
+		Move Weight_App -X(130) -Z(34)
+	
+	
+		On Robot_Clear_of_Weight_Scale
+	
+		On VS_Vision_Trigger
+		
+		On WeightScale_Trigger1
+	
+		Wait 2.5
+		
+		Off WeightScale_Trigger1
+	
+		Off VS_Vision_Trigger
+	
+		'Wait 0.1
+	
+		Orientation = InReal(Part_Orientation)
+		
+		'Wait 0.2
+	
+		Print "Angle:", (Orientation)
+
+		'Wait 1.5
+ 	
+ 	' Wait for VS Camera Success'
+ 
+	'Wait for VS Camera System to give new J6 value'
+		Do While Orientation = 0
+		
+			Orientation = InReal(Part_Orientation)
+		
+			On VS_Vision_Trigger
+	
+			Wait 0.2
+	
+			Off VS_Vision_Trigger
+			
+			If Sw(554) = 1 Then
+			
+				Move Weight_App -Z(34)
+	
+				Off Robot_Clear_of_Weight_Scale
+	
+				On Robot_In_Weight_Scale_Position
+			
+				Wait 0.2
+
+				On 549
+			
+				Wait Sw(560) = 1 'Wait for Close Gripper Bit'
+		
+				Go Weight_App -Z(34)
+		
+				Off 549
+			
+				Call Reject
+	
+				
+			EndIf
+		Loop
+	
+	If Orientation <> 0 Then
+	
+			Move Weight_App -Z(34)
+	
+			Off Robot_Clear_of_Weight_Scale
+	
+			On Robot_In_Weight_Scale_Position
+	
+			If Sw(Part1Enabled) = 1 Then
+		
+				Print "Angle before rotation:", (Orientation)
+
+
+
+					If Orientation < 0 Then
+					
+						Go Weight_App -Z(70) -RZ(Orientation + 180)
+						
+					EndIf
+			
+					If Orientation > 0 Then
+
+						Go Weight_App -Z(70) -RZ(Orientation + 180)
+			
+					EndIf
+
+				WaitPos
+
+				On 549
+			
+				Wait Sw(560) = 1 'Wait for Close Gripper Bit'
+		
+				Go Weight_App -Z(34)
+		
+				Off 549
+	
+			EndIf
+	ElseIf Orientation = 0 Then
+	
+		Move Weight_App -Z(34)
+	EndIf
+	
+EndIf
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Weigh Station for Part 2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~			
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+
+If Sw(Part2Enabled) = 1 Then
+			
+			On WeightScale_Trigger1
+			
+			Wait 2.5
+			
+			Off WeightScale_Trigger1
+			
+			On 549
+					
+			Wait Sw(560) = 1 'Wait for Close Gripper Bit'
+		
+			Off 549
+		
+EndIf
+	
+	
+EndIf
+
+ProcessStatus = InW(Process_status)
+
+If ProcessStatus = 30 Then
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+
+	Go Weight_App -Z(34)
+	
+	Off Robot_In_Weight_Scale_Position
+	
+	'If partstatus = 1 Then
+		'Call BallPress
+	'EndIf 
+	
+	'Wait Sw(560) = 1
+	
+    'Move weight_app -X(150) -Z(34)
+    
+    'Move weight_app +X(150) -Z(34)
+
+
+	Off WeightScale_PreTest
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    '-----------------------------------------------------------------------	
+		Print "Calling Fill Nest Function"
+	'-----------------------------------------------------------------------
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~    
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    'Call Reject
+	If Sw(592) = 1 Then
+	Call FillNest1
+	Exit Function
+	EndIf
+	
+	If Sw(593) = 1 Then
+	Call FillNest2
+	Exit Function
+	EndIf
+	
+	If Sw(594) = 1 Then
+	Call FillNest3
+	Exit Function
+	EndIf
+	
+	If Sw(595) = 1 Then
+	Call FillNest4
+	Exit Function
+	EndIf
+	
+EndIf
+
+Exit Function
+
+
+
+
+Fend
+Function WeightStation2
+	
+ProcessStatus = InW(Process_status)
+	
+	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Weigh Placement for Part 1~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+	
+	If Sw(Part1Enabled) = 1 Then
+		
+		Move Weight_App -RZ(90)
+	
+		'Move Weight_App -RZ(90)
+		
+		Move Weight_App -Z(70) -RZ(90)
+		
+		On WeightScale_PostTest
+		
+		On Robot_In_Weight_Scale_Position
+
+		On 550
+	
+		Wait Sw(561) = 1  'Wait for Open Gripper Bit'	
+	
+		Off 550
+		
+		On WeightScale_Trigger2
+		
+		Wait 2.5
+		
+		Off WeightScale_Trigger2
+		
+		Wait Sw(555) = 1
+		
+		On 549
+		
+		Wait Sw(560) = 1
+		
+		Off 549
+		
+		Move Weight_App -RZ(90)
+		
+		Off WeightScale_PostTest
+		
+		PartStatus = InW(Part_Status)
+			
+		If PartStatus = 0 Then
+		
+	'-----------------------------------------------------------------------	
+		Print "Calling Ball Press"
+	'-----------------------------------------------------------------------
+		
+		Call BallPress   'THIS NEEDS TO BE PUT BACK IN THE PROGRAM
+		
+	'-----------------------------------------------------------------------	
+		'Print "Part Calling Unload Station"
+	'-----------------------------------------------------------------------
+		
+		'Call Unload
+		
+		ElseIf PartStatus <> 0 Then
+			
+		Move Weight_App -X(150) -RZ(90) CP
+	
+		Call Reject
+		
+		EndIf
+		
+	EndIf
+	
+	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Weigh Placement for Part 2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+
+	If Sw(Part2Enabled) = 1 Then
+		
+		Move Weight_App -RZ(90)
+		
+		Move Weight_App -Z(70) -RZ(90)
+		
+		On WeightScale_PostTest
+		
+		On Robot_In_Weight_Scale_Position
+
+		On 550
+	
+		Wait Sw(561) = 1  'Wait for Open Gripper Bit'	
+	
+		Off 550
+		
+		On WeightScale_Trigger2
+		
+		Wait 2.5
+		
+		Off WeightScale_Trigger2
+		
+		On 549
+		
+		Wait Sw(560) = 1
+		
+		Off 549
+		
+		Move Weight_App -RZ(90)
+		
+		Off WeightScale_PostTest
+		
+	'-----------------------------------------------------------------------	
+		Print "Part Calling Unload Station"
+	'-----------------------------------------------------------------------
+		
+		Call BallPress   'THIS NEEDS TO BE PUT BACK IN THE PROGRAM
+		
+		'Call Unload
+		
+	EndIf
+	
+Exit Function
+	
+	
+Fend
+Function FillNest1
+	
+	
+	
+	
+	'Add IF statement to for load and unload?'
+'	If nestready1 = 1 Then
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Place for Part 1~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+If Sw(592) = 1 And Sw(Part1Enabled) = 1 Then
+		
+	'-----------------------------------------------------------------------	
+		Print "Fill Nest 1 Place"
+	'-----------------------------------------------------------------------
+		
+			Move weight_app +X(150) -Z(34)
+
+			On FillNest1_Clear
+		
+			Move FillNest1AppPart1 CP
+		
+			Move FillNest1App2Part1 CP
+			
+			WaitPos		' This is for debug purposes to check on part location when placing VL6.'
+			
+			Move FillNest1Part1
+		
+			Off FillNest2_Clear
+		
+			On 550
+	
+			Wait Sw(561) = 1  'Wait for Open Gripper Bit'	
+	
+			Off 550
+	
+			Move FillNest1App2Part1 CP
+			
+			Move FillNest1AppPart1 CP
+				
+			On FillNest1_Clear
+			
+			On Robot_FN1_PartPlace_ACK
+			
+			Move weight_app +X(150) -Z(34) CP
+			
+			Off Robot_FN1_PartPlace_ACK
+			
+			'If Sw(601) = 1 And Sw(592) = 0 And Sw(593) = 0 And Sw(594) = 0 And Sw(595) = 0 Then
+			'	Call FillNest2
+			'EndIf
+			
+			Move weight_app -X(150) -Z(34) CP
+	
+			'Call Start
+		
+			Exit Function
+		
+EndIf
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Place for Part 2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If Sw(592) = 1 And Sw(Part2Enabled) = 1 Then
+
+			Move weight_app +X(150) +Z(34)
+
+			On FillNest1_Clear
+		
+			'Move FillNest1AppPart1 +Z(60) CP
+			
+			Move FillNest1Part2 +Z(60)
+			
+			Move FillNest1Part2
+
+			Off FillNest1_Clear
+
+			On 550
+	
+			Wait Sw(561) = 1  'Wait for Open Gripper Bit'	
+	
+			Off 550
+			
+			Move FillNest1Part2 +Z(60)
+
+			'Move FillNest1AppPart1 +Z(60) CP
+			
+			On FillNest1_Clear
+			
+			On Robot_FN1_PartPlace_ACK
+			
+			Move weight_app +X(150) +Z(34)
+			
+			Off Robot_FN1_PartPlace_ACK
+			
+			Move weight_app -X(150) -Z(34)
+
+			
+			Exit Function
+
+EndIf
+	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Pick for Part 1~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~			
+
+If Sw(592) = 0 And Sw(600) = 1 And Sw(Part1Enabled) = 1 And Sw(561) = 1 Then
+		
+	'-----------------------------------------------------------------------	
+		Print "Fill Nest 1 Pick"
+	'-----------------------------------------------------------------------
+	
+			Move weight_app +X(150) -Z(34)
+		
+			Move FillNest1AppPart1 CP
+		
+			Move FillNest1App2Part1 CP
+		
+			Move FillNest1Part1 -Z(1.5)
+			
+			WaitPos
+		
+			On 549
+	
+			Wait Sw(560) = 1  'Wait for Close Gripper Bit'	
+	
+			Off 549
+			
+			Move FillNest1Part1
+			
+			WaitPos
+	
+			Move FillNest1App2Part1 CP
+			
+			Move FillNest1AppPart1 CP
+		
+			On FillNest1_Clear
+			
+			On Robot_FN1_PartPick_ACK
+				
+			Move Weight_App +X(150) -RZ(90) CP
+			
+			Off Robot_FN1_PartPick_ACK
+			
+			PartStatus = InW(Part_Status)
+			
+			If PartStatus <> 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling Reject"
+	'-----------------------------------------------------------------------
+				
+				Move Weight_App -X(150) -RZ(90) CP
+			
+				Call Reject
+			
+				Exit Function
+				
+				'EndIf
+				
+			ElseIf PartStatus = 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling WeightStation2 Function"
+	'-----------------------------------------------------------------------
+			
+				Call WeightStation2
+			
+			Exit Function
+			
+			EndIf
+EndIf
+		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Pick for Part 2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+		
+If Sw(592) = 0 And Sw(600) = 1 And Sw(Part2Enabled) = 1 And Sw(561) = 1 Then
+			
+			Move weight_app +X(150) +Z(34)
+
+			On FillNest1_Clear
+		
+			'Move FillNest1AppPart1 +Z(60) CP
+			
+			Move FillNest1Part2 +Z(60)
+			
+			Move FillNest1Part2
+
+			Off FillNest1_Clear
+
+			On 549
+	
+			Wait Sw(560) = 1  'Wait for Open Gripper Bit'	
+	
+			Off 549
+
+			Move FillNest1Part2 +Z(60)
+
+			'Move FillNest1AppPart1 +Z(60) CP
+
+			On FillNest1_Clear
+
+			On Robot_FN1_PartPick_ACK
+			
+			Move weight_app +X(150) +Z(34)
+
+			Off Robot_FN1_PartPick_ACK
+
+			PartStatus = InW(Part_Status)
+			
+			If PartStatus <> 0 Then
+			
+				Move Weight_App -X(150) -RZ(90) CP
+				
+	'-----------------------------------------------------------------------	
+		Print "Calling Reject"
+	'-----------------------------------------------------------------------
+			
+				Call Reject
+				
+			ElseIf PartStatus = 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling WeightStation2 Function"
+	'-----------------------------------------------------------------------
+			
+				Call WeightStation2
+			
+			Exit Function
+			
+			EndIf
+			
+EndIf
+
+	
+Fend
+Function FillNest2
+	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Place for Part 1~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+	
+If Sw(593) = 1 And Sw(Part1Enabled) = 1 Then
+		
+	'-----------------------------------------------------------------------	
+		Print "Fill Nest 2 Place"
+	'-----------------------------------------------------------------------
+		
+			Move weight_app +X(150) -Z(34)
+
+			On FillNest2_Clear
+		
+			Move FillNest2Part1 +Y(-50) CP
+			
+			WaitPos		' This is for debug purposes to check on part location when placing VL6.'			
+		
+			Move FillNest2Part1
+		
+			Off FillNest2_Clear
+		
+			On 550
+	
+			Wait Sw(561) = 1  'Wait for Open Gripper Bit'	
+	
+			Off 550
+	
+			Move FillNest2Part1 +Y(-50) CP
+		
+			On FillNest2_Clear
+			
+			On Robot_FN2_PartPlace_ACK
+			
+			Move weight_app +X(150) -Z(34)
+			
+			Off Robot_FN2_PartPlace_ACK
+	
+			'If Sw(600) = 1 And Sw(592) = 0 And Sw(593) = 0 And Sw(594) = 0 And Sw(595) = 0 Then
+			'	Call FillNest1
+			'EndIf
+		
+			Move weight_app -X(150) -Z(34)
+			
+			'Call Start
+		
+			Exit Function
+		
+EndIf
+		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Place for Part 2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+		
+If Sw(593) = 1 And Sw(Part2Enabled) = 1 Then
+
+			Move weight_app +X(150) +Z(15)
+
+			On FillNest2_Clear
+					
+			Move FillNest2Part2 +Z(35)
+			
+			Move FillNest2Part2
+
+			Off FillNest1_Clear
+
+			On 550
+	
+			Wait Sw(561) = 1  'Wait for Open Gripper Bit'	
+	
+			Off 550
+
+			Move FillNest2Part2 +Z(35)
+			
+			On FillNest2_Clear
+			
+			On Robot_FN2_PartPlace_ACK
+			
+			Move weight_app +X(150) +Z(15)
+			
+			Off Robot_FN2_PartPlace_ACK
+
+			Move weight_app -X(150) -Z(34)
+
+			Exit Function
+
+EndIf
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Pick for Part 1~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If Sw(593) = 0 And Sw(601) = 1 And Sw(Part1Enabled) = 1 And Sw(561) = 1 Then
+		
+	'-----------------------------------------------------------------------	
+		Print "Fill Nest 2 Pick"
+	'-----------------------------------------------------------------------
+	
+			Move weight_app +X(150) -Z(34)
+		
+			Move FillNest2Part1 +Y(-50) CP
+		
+			Move FillNest2Part1 -Z(1.5)
+			
+			WaitPos
+		
+			On 549
+	
+			Wait Sw(560) = 1  'Wait for Close Gripper Bit'	
+	
+			Off 549
+			
+			Move FillNest2Part1
+			
+			WaitPos
+	
+			Move FillNest2Part1 +Y(-50)
+		
+			On FillNest2_Clear
+			
+			On Robot_FN2_PartPick_ACK
+			
+			Move Weight_App +X(150) -RZ(90)
+			
+			Off Robot_FN2_PartPick_ACK
+			
+			PartStatus = InW(Part_Status)
+			
+			If PartStatus <> 0 Then
+			
+				Move Weight_App -X(150) -RZ(90) CP
+
+	'-----------------------------------------------------------------------	
+		Print "Calling Reject"
+	'-----------------------------------------------------------------------
+	
+				Call Reject
+			
+				Exit Function
+			
+			ElseIf PartStatus = 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling WeightStation2 Function"
+	'-----------------------------------------------------------------------			
+			
+			
+				Call WeightStation2
+			
+				Exit Function
+				
+			EndIf
+			
+EndIf
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Pick for Part 2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If Sw(593) = 0 And Sw(601) = 1 And Sw(Part2Enabled) = 1 And Sw(561) = 1 Then
+
+			Move weight_app +X(150) +Z(35)
+
+			On FillNest2_Clear
+			
+			Move FillNest2Part2 +Z(35)
+			
+			Move FillNest2Part2 -Z(5)
+
+			Off FillNest2_Clear
+
+			On 549
+	
+			Wait Sw(560) = 1  'Wait for Open Gripper Bit'	
+	
+			Off 549
+
+			Move FillNest2Part2 +Z(35)
+
+			On FillNest2_Clear
+
+			On Robot_FN2_PartPick_ACK
+			
+			Move weight_app +X(150) +Z(15)
+
+			Off Robot_FN2_PartPick_ACK
+			
+			PartStatus = InW(Part_Status)
+			
+			If PartStatus <> 0 Then
+			
+				Move Weight_App -X(150) -RZ(90) CP
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling Reject"
+	'-----------------------------------------------------------------------			
+	
+				Call Reject
+				
+			ElseIf PartStatus = 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling WeightStation2 Function"
+	'-----------------------------------------------------------------------
+			
+				Call WeightStation2
+			
+			Exit Function
+			
+			EndIf
+
+EndIf
+	
+Fend
+Function FillNest3
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Placement for Part 1~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If Sw(594) = 1 And Sw(Part1Enabled) = 1 Then
+		
+	'-----------------------------------------------------------------------	
+		Print "Fill Nest 3 Place"
+	'-----------------------------------------------------------------------
+		
+			Move weight_app -X(150) -Z(34)
+
+			On FillNest3_Clear
+		
+			Move FillNest3Part1 +Y(-50) CP
+			
+			WaitPos		' This is for debug purposes to check on part location when placing VL6.'
+		
+			Move FillNest3Part1
+		
+			Off FillNest3_Clear
+		
+			On 550
+	
+			Wait Sw(561) = 1  'Wait for Open Gripper Bit'	
+	
+			Off 550
+	
+			Move FillNest3Part1 +Y(-50) CP
+		
+			On FillNest3_Clear
+			
+			On Robot_FN3_PartPlace_ACK
+			
+			Move weight_app -X(150) -Z(34)
+			
+			Off Robot_FN3_PartPlace_ACK
+			
+			'If Sw(603) = 1 And Sw(592) = 0 And Sw(593) = 0 And Sw(594) = 0 And Sw(595) = 0 Then
+			'	Call FillNest4
+			'EndIf
+			'Call Start
+		
+			Exit Function
+		
+EndIf
+		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Placement for Part 2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If Sw(594) = 1 And Sw(Part2Enabled) = 1 Then
+
+			Move weight_app -X(150) +Z(15)
+
+			On FillNest3_Clear
+					
+			Move FillNest3Part2 +Z(35)
+			
+			Move FillNest3Part2
+
+			Off FillNest3_Clear
+
+			On 550
+	
+			Wait Sw(561) = 1  'Wait for Open Gripper Bit'	
+	
+			Off 550
+
+			Move FillNest3Part2 +Z(35)
+			
+			On FillNest3_Clear
+			
+			On Robot_FN3_PartPlace_ACK
+			
+			Move weight_app -X(150) +Z(15)
+			
+			Off Robot_FN3_PartPlace_ACK
+			
+			Exit Function
+
+EndIf
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Pick for Part 1~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	If Sw(594) = 0 And Sw(602) = 1 And Sw(Part1Enabled) = 1 And Sw(561) = 1 Then
+		
+	'-----------------------------------------------------------------------	
+		Print "Fill Nest 3 Pick"
+	'-----------------------------------------------------------------------
+	
+			Move weight_app -X(150) -Z(34)
+		
+			Move FillNest3Part1 +Y(-50) CP
+		
+			Move FillNest3Part1 -Z(1.5)
+			
+			WaitPos
+		
+			On 549
+	
+			Wait Sw(560) = 1  'Wait for Close Gripper Bit'	
+	
+			Off 549
+	
+			Move FillNest3Part1
+			
+			WaitPos
+	
+			Move FillNest3Part1 +Y(-50) CP
+		
+			On FillNest3_Clear
+			
+			On Robot_FN3_PartPick_ACK
+			
+			Move Weight_App -X(150) -RZ(90)
+			
+			Off Robot_FN3_PartPick_ACK
+			
+			PartStatus = InW(Part_Status)
+			
+			If PartStatus <> 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling Reject"
+	'-----------------------------------------------------------------------
+	
+				Call Reject
+			
+			ElseIf PartStatus = 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling WeightStation2 Function"
+	'-----------------------------------------------------------------------
+			
+				Call WeightStation2
+			
+			Exit Function
+			
+			EndIf
+			
+	EndIf
+	
+	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Pick for Part 2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+
+
+	If Sw(594) = 0 And Sw(602) = 1 And Sw(Part2Enabled) = 1 And Sw(561) = 1 Then
+
+			Move weight_app -X(150) +Z(35)
+
+			On FillNest3_Clear
+			
+			Move FillNest3Part2 +Z(35)
+			
+			Move FillNest3Part2 -Z(5)
+
+			Off FillNest3_Clear
+
+			On 549
+	
+			Wait Sw(560) = 1  'Wait for Open Gripper Bit'	
+	
+			Off 549
+
+			Move FillNest3Part2 +Z(35)
+
+			On FillNest3_Clear
+
+			On Robot_FN3_PartPick_ACK
+
+			Move weight_app -X(150) +Z(35)
+
+			Off Robot_FN3_PartPick_ACK
+			
+			PartStatus = InW(Part_Status)
+			
+			If PartStatus <> 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling Reject"
+	'-----------------------------------------------------------------------			
+			
+				Call Reject
+				
+				Exit Function
+				
+			ElseIf PartStatus = 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling WeightStation2 Function"
+	'-----------------------------------------------------------------------
+			
+				Call WeightStation2
+			
+			Exit Function
+			
+			EndIf
+
+	EndIf
+
+Fend
+Function FillNest4
+
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Placement for Part 1~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+		If Sw(595) = 1 And Sw(Part1Enabled) = 1 Then
+		
+	'-----------------------------------------------------------------------	
+		Print "Fill Nest 4 Place"
+	'-----------------------------------------------------------------------
+		
+			Move weight_app -X(150) -Z(34)
+
+			On FillNest4_Clear
+		
+			Move FillNest4Part1 +Y(-50) CP
+			
+			WaitPos		' This is for debug purposes to check on part location when placing VL6.'
+		
+			Move FillNest4Part1
+		
+			Off FillNest4_Clear
+		
+			On 550
+	
+			Wait Sw(561) = 1  'Wait for Open Gripper Bit'	
+	
+			Off 550
+	
+			Move FillNest4Part1 +Y(-50) CP
+		
+			On FillNest4_Clear
+			
+			On Robot_FN4_PartPlace_ACK
+			
+			Move weight_app -X(150) -Z(34)
+	
+			Off Robot_FN4_PartPlace_ACK
+		
+			'If Sw(602) = 1 And Sw(592) = 0 And Sw(593) = 0 And Sw(594) = 0 And Sw(595) = 0 Then
+			'	Call FillNest3
+			'EndIf
+			'Call Start
+		
+			Exit Function
+		
+		EndIf
+	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Placement for Part 2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If Sw(595) = 1 And Sw(Part2Enabled) = 1 Then
+
+			Move weight_app -X(150) +Z(15)
+
+			On FillNest4_Clear
+			
+			Move FillNest4Part2 -Y(30) +Z(35) CP
+					
+			Move FillNest4Part2 +Z(35)
+			
+			Move FillNest4Part2
+
+			Off FillNest4_Clear
+
+			On 550
+	
+			Wait Sw(561) = 1  'Wait for Open Gripper Bit'	
+	
+			Off 550
+
+			Move FillNest4Part2 +Z(35)
+			
+			On FillNest4_Clear
+			
+			Move FillNest4Part2 -Y(30) +Z(35) CP
+			
+			On Robot_FN4_PartPlace_ACK
+			
+			Move weight_app -X(150) +Z(15)
+			
+			Off Robot_FN4_PartPlace_ACK
+			
+			Exit Function
+
+EndIf
+	
+	' This is where Pick Request Comes in'
+	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Pick for Part 1~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~		
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+	
+		If Sw(595) = 0 And Sw(603) = 1 And Sw(Part1Enabled) = 1 And Sw(561) = 1 Then
+	
+	'-----------------------------------------------------------------------	
+		Print "Fill Nest 4 Pick"
+	'-----------------------------------------------------------------------	
+	
+			Move weight_app -X(150) -Z(34)
+		
+			Move FillNest4Part1 +Y(-50) CP
+		
+			Move FillNest4Part1 -Z(1.5)
+		
+			WaitPos
+		
+			On 549
+	
+			Wait Sw(560) = 1  'Wait for Close Gripper Bit'	
+	
+			Off 549
+	
+			Move FillNest4Part1
+			
+			WaitPos
+	
+			Move FillNest4Part1 +Y(-50) CP
+		
+			On FillNest4_Clear
+			
+			On Robot_FN4_PartPick_ACK
+
+			Move Weight_App -X(150) -RZ(90)
+			
+			Off Robot_FN4_PartPick_ACK
+			
+			PartStatus = InW(Part_Status)
+
+			If PartStatus <> 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling Reject"
+	'-----------------------------------------------------------------------			
+			
+				Call Reject
+			
+				Exit Function
+			
+			ElseIf PartStatus = 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling WeightStation2 Function"
+	'-----------------------------------------------------------------------
+			
+				Call WeightStation2
+			
+				Exit Function
+			
+			EndIf
+			
+		EndIf
+			
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This is Nest Pick for Part 2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+
+
+	If Sw(595) = 0 And Sw(603) = 1 And Sw(Part2Enabled) = 1 And Sw(561) = 1 Then
+
+			Move weight_app -X(150) +Z(34)
+			
+			Move FillNest4Part2 -Y(30) +Z(35) CP
+
+			On FillNest4_Clear
+			
+			Move FillNest4Part2 +Z(35)
+			
+			Move FillNest4Part2 -Z(5)
+
+			Off FillNest4_Clear
+
+			On 549
+	
+			Wait Sw(560) = 1  'Wait for Open Gripper Bit'	
+	
+			Off 549
+
+			Move FillNest4Part2 +Z(35)
+			
+			Move FillNest4Part2 -Y(30) +Z(35) CP
+
+			On FillNest4_Clear
+
+			On Robot_FN4_PartPick_ACK
+
+			Move weight_app -X(150) -Z(34)
+
+			Off Robot_FN4_PartPick_ACK
+
+			PartStatus = InW(Part_Status)
+
+			If PartStatus <> 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling Reject"
+	'-----------------------------------------------------------------------			
+			
+				Call Reject
+				
+				Exit Function
+			
+			ElseIf PartStatus = 0 Then
+			
+	'-----------------------------------------------------------------------	
+		Print "Calling WeightStation2 Function"
+	'-----------------------------------------------------------------------
+			
+				Call WeightStation2
+			
+				Exit Function
+			
+			EndIf
+			
+	EndIf
+			
+	
+Fend
+Function BallPress
+	
+ProcessStatus = InW(Process_status)
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+' PART 1 BALL PRESS
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+If Sw(BallPressRequest) = 1 And Sw(552) = 1 Then
+	
+	'-----------------------------------------------------------------------	
+		Print "I am in Ball Press"
+	'-----------------------------------------------------------------------
+	
+		Move weight_app +X(150) -Z(34)
+	
+		Go BallPressPart1 +X(-75)
+		
+		WaitPos
+	
+		Move BallPressPart1
+		
+		Wait Sw(596) = 1
+	
+		On Robot_BallPress_PartPlace_ACK
+	
+		'Wait for Open Gripper Bit'
+
+		Wait Sw(561) = 1
+	
+		Off Robot_BallPress_PartPlace_ACK
+		
+		'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+		'NEED TO ADD CODE HERE TO CHECK THE UNLOAD DRAWER CAPACITY.'
+		'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+		
+		
+		Move BallPressPart1 +X(-75)
+		
+		Move Unload_App
+					
+		Call Unloadcheck
+		
+		Move Unload_App
+		
+		Move BallPressPart1 +X(-75) CP
+		
+		Move BallPressPart1 -Z(1.5)
+		
+		WaitPos
+				
+		Wait Sw(604) = 1
+	
+		On Robot_BallPress_PartPick_ACK
+	
+		Wait Sw(560) = 1
+		
+		Move BallPressPart1
+	
+		Move BallPressPart1 +X(-75)
+		
+		Off Robot_BallPress_PartPick_ACK
+	
+		PartStatus = InW(Part_Status)
+			
+		If PartStatus = 0 Then
+	
+			Move Unload_App CP
+	
+			On BallPress_Clear
+		
+			Call Unload
+	
+			Off BallPress_Clear
+		
+		ElseIf PartStatus <> 0 Then
+		
+			Go Weight_App +X(180)
+			
+			Move Weight_App -X(150) -RZ(90) CP
+			
+			Call Reject
+			
+		EndIf
+			
+EndIf
+			
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+' PART 2 BALL PRESS
+'~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~			
+			
+If Sw(BallPressRequest) = 1 And Sw(553) = 1 Then
+	
+	'-----------------------------------------------------------------------	
+		Print "I am in Ball Press 2"
+	'-----------------------------------------------------------------------
+	
+		Move weight_app +X(150) -Z(34)
+	
+		Go BallPressPart2 +Z(75) CP
+	
+		Move BallPressPart2
+		
+		Wait Sw(596) = 1
+	
+		On Robot_BallPress_PartPlace_ACK
+	
+		'Wait for Open Gripper Bit'
+
+		Wait Sw(561) = 1
+	
+		Off Robot_BallPress_PartPlace_ACK
+		
+		Move BallPressPart2 +Z(75)
+		
+		Move Unload_App
+					
+		Call Unloadcheck
+		
+		Move Unload_App
+		
+		Move BallPressPart2 +Z(75)
+		
+		Move BallPressPart2
+		
+		WaitPos
+	
+		Wait Sw(604) = 1
+	
+		On Robot_BallPress_PartPick_ACK
+	
+		Wait Sw(560) = 1
+	
+		Move BallPressPart2 +Z(100)
+		
+		Off Robot_BallPress_PartPick_ACK
+	
+		PartStatus = InW(Part_Status)
+			
+		If PartStatus = 0 Then
+	
+			Move Unload_App CP
+	
+			On BallPress_Clear
+		
+			Call Unload
+	
+			Off BallPress_Clear
+		
+		ElseIf PartStatus <> 0 Then
+		
+			Go Weight_App +X(180)
+			
+			Move Weight_App -X(150) -RZ(90) CP
+			
+			Call Reject
+			
+		EndIf
+	
+EndIf
+	
+	'Call Unload
+		
+	Exit Function
+		
+Fend
+Function Unloadcheck
+	
+	Print "I am checking the Unload totes for a free location."
+
+	LUnload = InW(LUnload_Counter)
+	RUnload = InW(RUnload_Counter)
+	
+	Wait Sw(UnloadSafe) = 1
+	
+		
+	If LUnload = 16 And RUnload = 16 Then
+		
+		Wait LUnload = 0 Or RUnload = 0
+	
+		Call Unloadcheck
+		
+	EndIf
+	
+	On 573
+	
+	If LUnload <= 15 Then
+		Print "Cell Number LUnload:", (LUnload)
+		
+		Go Pallet(3, LUnload) +Z(250)
+
+		Move Pallet(3, LUnload) -Z(15)
+		
+		On Robot_Gripper_Close_Request 'Output 549 = On 'Gripper Close Output''
+		
+		Wait 1
+		
+		If Sw(560) = 1 Then
+
+			Off Robot_Gripper_Close_Request
+
+			On Robot_Gripper_Open_Request
+
+			On LUnload_Increment
+
+			Move Pallet(3, LUnload) +Z(70)
+
+			Off LUnload_Increment
+
+			Off Robot_Gripper_Open_Request
+
+			Call Unloadcheck
+		
+		EndIf
+		
+		Off Robot_Gripper_Close_Request
+
+		On Robot_Gripper_Open_Request
+		
+		Move Pallet(3, LUnload) +Z(250)
+		
+		Off Robot_Gripper_Open_Request
+		
+		Exit Function
+		
+	EndIf
+
+		
+	If RUnload <= 15 And LUnload = 16 And Sw(UnloadSafe) = 1 Then
+		Print "Cell Number RUnload:", (RUnload)
+		
+		Go Pallet(4, RUnload) +Z(250)
+
+		Move Pallet(4, RUnload) -Z(15)
+		
+		On Robot_Gripper_Close_Request 'Output 549 = On 'Gripper Close Output''
+		
+		Wait 1
+		
+		If Sw(560) = 1 Then
+
+			Off Robot_Gripper_Close_Request
+
+			On Robot_Gripper_Open_Request
+
+			On RUnload_Increment
+
+			Move Pallet(4, RUnload) +Z(70)
+
+			Off RUnload_Increment
+
+			Off Robot_Gripper_Open_Request
+
+			Call Unloadcheck
+		
+		EndIf
+		
+		Off Robot_Gripper_Close_Request
+
+		On Robot_Gripper_Open_Request
+		
+		Move Pallet(4, RUnload) +Z(250)
+		
+		Off Robot_Gripper_Open_Request
+		
+		Exit Function
+	EndIf
+		Exit Function
+Fend
+Function Unload
+	LUnload = InW(LUnload_Counter)
+	RUnload = InW(RUnload_Counter)
+	
+	'Move Weight_App +X(150) -RZ(90)
+	
+	Wait Sw(UnloadSafe) = 1
+	
+		
+	If LUnload = 16 And RUnload = 16 Then
+		
+		Wait LUnload = 0 Or RUnload = 0
+	
+		Call Unload
+	
+	EndIf
+	
+	On 573
+	
+	Go Unload_App
+	
+	If LUnload <= 15 Then
+		Print "Cell Number LUnload:", (LUnload)
+		
+		On LUnload_Increment
+		
+        Go Pallet(3, LUnload) +Z(250)
+
+		Move Pallet(3, LUnload) -Z(5)
+	
+		On Robot_Gripper_Open_Request 'Output 549 = On 'Gripper Close Output''
+		
+		Wait Sw(561) = 1
+		'Wait 0.2
+		
+		On Store_Data
+		
+		Off Robot_Gripper_Open_Request 'Output 549 = Off 'Gripper Close Output''
+				
+		Move Pallet(3, LUnload) +Z(250)
+		
+		Off LUnload_Increment
+	
+		Go Unload_App
+		
+		Off Store_Data
+
+		Go Weight_App +X(180)
+		
+		Off 573
+	
+		Move Weight_App -X(150) CP
+	
+		
+		Exit Function
+		'Call Loaddrawer
+		'Go LLoad_App
+	EndIf
+	
+	If RUnload <= 15 And LUnload = 16 And Sw(UnloadSafe) = 1 Then
+		Print "Cell Number RUnload:", (RUnload)
+		
+		On RUnload_Increment
+		
+        Go Pallet(4, RUnload) +Z(250)
+        
+		Move Pallet(4, RUnload) -Z(5)
+		
+		On Robot_Gripper_Open_Request 'Output 549 = On 'Gripper Close Output''
+		
+		Wait Sw(561) = 1
+		'Wait 0.2
+		
+		Off Robot_Gripper_Open_Request 'Output 549 = Off 'Gripper Close Output''
+						
+		Move Pallet(4, RUnload) +Z(250)
+		
+		Off RUnload_Increment
+	
+		On Store_Data
+	
+		Go Unload_App
+		
+		Off Store_Data
+
+		Go Weight_App +X(180)
+		
+		Off 573
+	
+		Move Weight_App -X(150) CP
+	
+		
+		'Exit Function
+		'Call Loaddrawer
+		'Go RUnLoad_App
+		Exit Function
+	EndIf
+		
+
+	
+	Exit Function
+	
+Fend
+Function Reject
+	
+	
+	Rejectcount = InW(Reject_Counter)
+	
+	Wait 1
+
+	Wait Sw(576) = 1
+	
+	If Rejectcount > 9 Then
+	'-----------------------------------------------------------------------	
+		Print "Reject Full Loop"
+	'----------------------------------------------------------------------- 
+	
+			On Robot_Reject_Safe_Point
+			Wait Sw(576) = 0
+			Wait Sw(576) = 1
+			Wait 3
+			Call Reject
+		
+	EndIf
+	
+	If Rejectcount <= 9 Then
+	
+		Off Robot_Reject_Safe_Point
+	
+		Move Cell_Scan 'weight_app -X(150)
+		
+		Move Pallet(2, Rejectcount) +Z(215)
+		
+		If Sw(552) = 1 Then
+	
+		Move Pallet(2, Rejectcount) -Z(10)
+	
+		ElseIf Sw(553) = 1 Then
+		
+		Move Pallet(2, Rejectcount) -Z(15)
+		
+		EndIf
+	
+		On Robot_Gripper_Open_Request 'Output 549 = On 'Gripper Close Output''
+		
+		On Store_Reject_Data
+		
+		Wait Sw(561) = 1
+		'Wait 0.2
+		
+		Off Robot_Gripper_Open_Request 'Output 549 = Off 'Gripper Close Output''	
+	
+		On Reject_Increment
+		
+		Move Pallet(2, Rejectcount) +Z(115)
+		
+		Off Store_Reject_Data
+	
+		Off Reject_Increment
+		
+		If (Sw(592) = 0 And Sw(593) = 0 And Sw(594) = 0 And Sw(595) = 0) Or (LLoad = 16 And Sw(578) = 0) Or (RLoad = 16 And Sw(577) = 0) Or (LLoad = 16 And RLoad = 16) Then
+
+			Move Cell_Scan
+			Home
+		
+		EndIf
+
+		Exit Function
+
+	EndIf
+	
+	'If Rejectcount = 10 Then
+	'	Wait Rejectcount = 1
+	'	Call Reject
+	'EndIf
+	'-----------------------------------------------------------------------	
+		Print "Restarting Program"
+	'-----------------------------------------------------------------------	
+	'Call Loaddrawer
+	Exit Function
+Fend
 
