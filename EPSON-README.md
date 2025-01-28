@@ -1,11 +1,9 @@
 # Epson
 
-In these files you will see the code I used to program the Epson Robot.
+The code in this repository is being used to teach an Epson robot in an enclosed cell. 
 
-The Epson robot is taught in SPEL+ language.
+This single epson code is used to pick a part from an operator load location and runs the parts through its processing cycle. 
 
-The software that is being used is Epson RC+ 7.0.
+The Epson robot is taught in SPEL+ language using the "Epson RC+ 7.0" software.
 
-There is only one code for this repository since there was only one robot being programmed.
-
-*Note: Modifications are still possible to this code.
+*** Note: Modifications on to this code is still in progress. 
